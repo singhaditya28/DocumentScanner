@@ -68,4 +68,21 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 
     implementation(libs.play.services.mlkit.document.scanner)
+
+    // Networking
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+    implementation(libs.moshi.kotlin)
+
+    // Persistence
+    implementation(libs.datastore.preferences)
+
+    // Navigation
+    implementation(libs.navigation.compose)
+
+    // Coroutines
+    implementation(libs.kotlinx.coroutines.android)
+
+    // ViewModel
+    implementation(libs.lifecycle.viewmodel.compose)
 }
