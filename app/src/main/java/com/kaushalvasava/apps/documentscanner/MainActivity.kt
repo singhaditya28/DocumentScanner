@@ -8,14 +8,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.kaushalvasava.apps.documentscanner.data.SettingsDataStore
 import com.kaushalvasava.apps.documentscanner.ui.screen.HomeScreen
 import com.kaushalvasava.apps.documentscanner.ui.screen.LoginScreen
 import com.kaushalvasava.apps.documentscanner.ui.screen.SettingsScreen
+import com.kaushalvasava.apps.documentscanner.ui.theme.AppTheme
 import com.kaushalvasava.apps.documentscanner.ui.theme.DocumentScannerTheme
 import com.kaushalvasava.apps.documentscanner.ui.viewmodel.AuthViewModel
 import com.kaushalvasava.apps.documentscanner.ui.viewmodel.ScannerViewModel
@@ -30,7 +35,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            DocumentScannerTheme {
+            // Read persisted theme from DataStore
+            val dataStore = remember { SettingsDataStore(applicationContext) }
+            val savedThemeKey by dataStore.appTheme.collectAsState(initial = null)
+            // Live theme state — updated immediately when user picks in Settings
+            var currentTheme by remember(savedThemeKey) {
+                mutableStateOf(AppTheme.fromWebKey(savedThemeKey))
+            }
+
+            DocumentScannerTheme(appTheme = currentTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -44,9 +57,8 @@ class MainActivity : ComponentActivity() {
                         factory = ScannerViewModel.Factory(applicationContext)
                     )
 
-                    // Determine start destination: logged in → home, else → login
                     val savedToken by authViewModel.isLoggedIn.collectAsState(initial = null)
-                    // null means still loading; use login as safe default
+                    val userName by authViewModel.userName.collectAsState(initial = null)
                     val startDestination = if (savedToken != null && savedToken!!.isNotBlank())
                         Routes.HOME else Routes.LOGIN
 
@@ -67,8 +79,15 @@ class MainActivity : ComponentActivity() {
                         composable(Routes.HOME) {
                             HomeScreen(
                                 viewModel = scannerViewModel,
+                                userName = userName,
                                 onNavigateToSettings = {
                                     navController.navigate(Routes.SETTINGS)
+                                },
+                                onSessionExpired = {
+                                    authViewModel.logout()
+                                    navController.navigate(Routes.LOGIN) {
+                                        popUpTo(0) { inclusive = true }
+                                    }
                                 }
                             )
                         }
@@ -81,7 +100,9 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate(Routes.LOGIN) {
                                         popUpTo(0) { inclusive = true }
                                     }
-                                }
+                                },
+                                // Live theme swap — no app restart needed
+                                onThemeChange = { newTheme -> currentTheme = newTheme }
                             )
                         }
                     }

@@ -26,6 +26,9 @@ class AuthViewModel(private val dataStore: SettingsDataStore) : ViewModel() {
     /** Flow of whether the user is currently logged in. */
     val isLoggedIn = dataStore.accessToken
 
+    /** First name of the logged-in user for the greeting. */
+    val userName = dataStore.userName
+
     fun login(email: String, password: String) {
         if (email.isBlank() || password.isBlank()) {
             _uiState.value = AuthUiState.Error("Email and password cannot be empty")

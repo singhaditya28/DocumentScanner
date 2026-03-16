@@ -23,6 +23,8 @@ class SettingsDataStore(private val context: Context) {
         val USER_EMAIL = stringPreferencesKey("user_email")
         val TEMPLATE_ID = stringPreferencesKey("template_id")
         val AUTO_PROCESS = booleanPreferencesKey("auto_process")
+        // Stores the web-compatible theme key, e.g. "light", "dark", "theme-miracle-orange"
+        val APP_THEME = stringPreferencesKey("app_theme")
     }
 
     val accessToken: Flow<String?> = context.dataStore.data.map { it[ACCESS_TOKEN] }
@@ -32,6 +34,7 @@ class SettingsDataStore(private val context: Context) {
     val userEmail: Flow<String?> = context.dataStore.data.map { it[USER_EMAIL] }
     val templateId: Flow<String?> = context.dataStore.data.map { it[TEMPLATE_ID] }
     val autoProcess: Flow<Boolean> = context.dataStore.data.map { it[AUTO_PROCESS] ?: false }
+    val appTheme: Flow<String?> = context.dataStore.data.map { it[APP_THEME] }
 
     suspend fun saveSession(
         accessToken: String,
@@ -57,6 +60,12 @@ class SettingsDataStore(private val context: Context) {
                 prefs[TEMPLATE_ID] = templateId
             }
             prefs[AUTO_PROCESS] = autoProcess
+        }
+    }
+
+    suspend fun saveTheme(themeWebKey: String) {
+        context.dataStore.edit { prefs ->
+            prefs[APP_THEME] = themeWebKey
         }
     }
 

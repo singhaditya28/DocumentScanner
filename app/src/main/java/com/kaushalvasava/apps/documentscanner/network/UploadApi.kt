@@ -1,6 +1,8 @@
 package com.kaushalvasava.apps.documentscanner.network
 
 import android.util.Log
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -16,22 +18,22 @@ private const val BASE_URL = "https://dashboard.miracleai.in"
 private const val TAG = "UploadApi"
 
 sealed class UploadResult {
-    object Success : UploadResult()
-    data class Error(val message: String) : UploadResult()
+    data class Success(val document: UploadedDocument) : UploadResult()
+    data class Error(val message: String, val code: Int = -1) : UploadResult()
 }
 
 object UploadApi {
 
-    private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BASIC
-    }
+    private val moshi: Moshi = Moshi.Builder()
+        .addLast(KotlinJsonAdapterFactory())
+        .build()
 
     private val client: OkHttpClient = OkHttpClient.Builder()
-        .addInterceptor(loggingInterceptor)
+        .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
         .build()
 
     /**
-     * Uploads a single scanned file to the backend.
+     * Uploads a single scanned file to the backend and parses the returned document.
      *
      * @param file The JPEG (single page) or PDF (multiple pages) to upload.
      * @param accessToken The JWT bearer token.
@@ -68,12 +70,27 @@ object UploadApi {
                 .build()
 
             val response = client.newCall(request).execute()
+            val body = response.body?.string() ?: ""
+
             if (response.isSuccessful) {
-                UploadResult.Success
+                // Parse the returned UserDocument — server always returns the full object
+                val adapter = moshi.adapter(UploadedDocument::class.java)
+                val doc = try {
+                    adapter.fromJson(body)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not parse upload response, using fallback: $e")
+                    null
+                }
+                // Fallback: create a minimal doc if JSON parse fails
+                val uploadedDoc = doc ?: UploadedDocument(
+                    docId = 0,
+                    originalFilename = file.name,
+                    status = "pending"
+                )
+                UploadResult.Success(uploadedDoc)
             } else {
-                val body = response.body?.string() ?: ""
                 Log.e(TAG, "Upload failed [${response.code}]: $body")
-                UploadResult.Error("Upload failed (${response.code}): ${response.message}")
+                UploadResult.Error("Upload failed (${response.code}): ${response.message}", response.code)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Upload exception", e)
